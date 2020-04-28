@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 
-from VowelsCounter_Flask.DBcm import UseDatabase
+from DBcm import UseDatabase
 
 app = Flask(__name__)
 # app.config is regulary a dictionary in Python, in which we can add different configurations
