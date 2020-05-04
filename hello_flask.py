@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request, session, copy_current_request_context
 from checker import check_logged_in
 from DBcm import UseDatabase, ConnectionError, CredentialsError, SQLError
+from threading import Thread
+from time import sleep
 
 app = Flask(__name__)
 # app.config is regulary a dictionary in Python, in which we can add different configurations
@@ -32,33 +34,35 @@ def check_status() -> str:
     return 'You are NOT logged in'
 
 
-def log_request(req: 'flask_request', res: str):
-
-    with UseDatabase(app.config['dbconfig']) as cursor:
-        _SQL = """insert into log
-        (phrase, letters, ip, browser_string, results)
-        values
-        (%s, %s, %s, %s, %s)
-        """
-        cursor.execute(_SQL, (req.form['phrase'],
-                          req.form['letters'],
-                          req.remote_addr,
-                          req.user_agent.browser,
-                          res, ))
-
-
     # with open('vsearch.log', 'a') as log:
     #   print(req.form, req.remote_addr, req.user_agent, res, file=log, sep='|')
 
 
 @app.route('/search4', methods=['POST'])
 def do_search() -> 'html':
+
+    @copy_current_request_context
+    def log_request(req: 'flask_request', res: str):
+        sleep(15)
+        with UseDatabase(app.config['dbconfig']) as cursor:
+            _SQL = """insert into log
+            (phrase, letters, ip, browser_string, results)
+            values
+            (%s, %s, %s, %s, %s)
+            """
+            cursor.execute(_SQL, (req.form['phrase'],
+                                  req.form['letters'],
+                                  req.remote_addr,
+                                  req.user_agent.browser,
+                                  res,))
+
     phrase = request.form['phrase']
     letters = request.form['letters']
     title = 'Here are your results: '
     results = str(search4letters(phrase, letters))
     try:
-        log_request(request, results)
+        t = Thread(target=log_request, args=(request,results))
+        t.start()
     except Exception as err:
         print('Logging failed with this error:', str(err))
     return render_template('results.html',
